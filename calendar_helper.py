@@ -14,7 +14,7 @@ def authenticate_google_calendar():
     # Check if token.json exists
     if os.path.exists('token.json'):
         try:
-            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
             print("✅ Loaded existing credentials from token.json")
         except Exception as e:
             print(f"❌ Error loading token.json: {e}")
@@ -24,7 +24,7 @@ def authenticate_google_calendar():
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             try:
-                creds.refresh(Request())
+            creds.refresh(Request())
                 print("✅ Refreshed expired credentials")
             except Exception as e:
                 print(f"❌ Error refreshing credentials: {e}")
@@ -42,13 +42,13 @@ def authenticate_google_calendar():
                 return None
             
             try:
-                flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-                creds = flow.run_local_server(port=0)
+            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
+            creds = flow.run_local_server(port=0)
                 print("✅ Successfully authenticated with Google Calendar")
                 
                 # Save the credentials for the next run
-                with open('token.json', 'w') as token:
-                    token.write(creds.to_json())
+        with open('token.json', 'w') as token:
+            token.write(creds.to_json())
                 print("💾 Saved credentials to token.json")
                 
             except Exception as e:
@@ -88,26 +88,26 @@ def test_calendar_connection():
 def create_event(summary, start_time, duration_minutes=30, description="Voice agent appointment"):
     """Create a Google Calendar event"""
     try:
-        creds = authenticate_google_calendar()
+    creds = authenticate_google_calendar()
         if not creds:
             print("❌ Cannot create event: Authentication failed")
             return None
         
-        service = build('calendar', 'v3', credentials=creds)
-        
-        end_time = start_time + datetime.timedelta(minutes=duration_minutes)
-        event = {
-            'summary': summary,
-            'description': description,
-            'start': {
-                'dateTime': start_time.isoformat(),
+    service = build('calendar', 'v3', credentials=creds)
+    
+    end_time = start_time + datetime.timedelta(minutes=duration_minutes)
+    event = {
+        'summary': summary,
+        'description': description,
+        'start': {
+            'dateTime': start_time.isoformat(),
                 'timeZone': 'America/New_York',  # Updated timezone
-            },
-            'end': {
-                'dateTime': end_time.isoformat(),
+        },
+        'end': {
+            'dateTime': end_time.isoformat(),
                 'timeZone': 'America/New_York',  # Updated timezone
-            },
-        }
+        },
+    }
 
         event_result = service.events().insert(calendarId='primary', body=event).execute()
         event_link = event_result.get('htmlLink')

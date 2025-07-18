@@ -17,3 +17,6 @@ beautifulsoup4
 librosa
 soundfile
 scipy
+python-dotenv
+twilio
+flask
