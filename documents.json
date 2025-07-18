@@ -1,1 +1,82 @@
-["Customer A prefers morning calls.", "Late payments incur a 5% fee.", "Our services are available Monday through Friday."]
+[
+  {
+    "title": "Straight-Through Invoice Processing",
+    "content": "Hyprbots enables up to 80% straight-through invoice processing within 8 weeks, significantly reducing manual intervention and improving efficiency."
+  },
+  {
+    "title": "Intelligent Document Processing",
+    "content": "Uses LLMs and transformer models to extract all relevant fields from invoices accurately, reducing the need for human validation."
+  },
+  {
+    "title": "AI-Led Capitalization and Amortization",
+    "content": "Automates capitalization and amortization tasks, ensuring high accuracy and operational efficiency for finance teams."
+  },
+  {
+    "title": "AI-Powered Invoice Matching",
+    "content": "Automatically matches invoices with purchase orders and delivery notes using AI algorithms, minimizing reconciliation errors."
+  },
+  {
+    "title": "Automated Tax Verification",
+    "content": "Automatically verifies applicable sales tax on invoices based on item description and shipping address, ensuring tax compliance."
+  },
+  {
+    "title": "Automated Accruals",
+    "content": "Books and reverses accruals for goods and services with pending invoices or approvals, reducing month-end workload."
+  },
+  {
+    "title": "Duplicate Invoice Detection",
+    "content": "Identifies and flags duplicate or incomplete invoices, helping maintain data integrity and avoid double payments."
+  },
+  {
+    "title": "Accounts Payable Cost Optimization",
+    "content": "Achieves over 80% cost optimization in AP processes by automating tasks like invoice processing, accruals, GL coding, and early payment recommendations."
+  },
+  {
+    "title": "Cash Outflow Reduction",
+    "content": "Recommends optimal payment timings to leverage early payment discounts and delay non-critical payments, reducing up to 10% in cash outflow."
+  },
+  {
+    "title": "Vendor Satisfaction Enhancement",
+    "content": "Provides vendors access to real-time invoice status via AI-assistant, promoting transparency and improving collaboration."
+  },
+  {
+    "title": "Audit Readiness and Compliance",
+    "content": "Creates system-driven GL entries with detailed audit trails, leading to accurate financial books and enhanced audit readiness."
+  },
+  {
+    "title": "Zero System Integration Cost",
+    "content": "Hyprbots is pre-integrated with popular ERP, CRM, and business platforms, reducing deployment friction and IT costs."
+  },
+  {
+    "title": "GL Code Recommendation",
+    "content": "Recommends GL codes automatically for invoices using AI, ensuring consistency and speeding up accounting workflows."
+  },
+  {
+    "title": "Vendor Payment Timing Recommendation",
+    "content": "Analyzes vendor terms to suggest early or delayed invoice payments, optimizing working capital."
+  },
+  {
+    "title": "Security and Data Privacy",
+    "content": "Implements end-to-end encryption for data in transit and at rest. Offers role-based access control for secure data handling."
+  },
+  {
+    "title": "Compliance Certifications",
+    "content": "Hyprbots is compliant with SOC 1 Type 2, SOC 2 Type 2, ISO27001, and GDPR, ensuring enterprise-grade security and data privacy."
+  },
+  {
+    "title": "Chat-Based Analytics Interaction",
+    "content": "Supports ChatGPT-style conversational analytics, enabling users to query finance data using natural language."
+  },
+  {
+    "title": "Competitive Advantage",
+    "content": "Compared to other vendors, Hyprbots offers higher accuracy, AI-first capabilities, and comprehensive automation with no need for rules-based systems."
+  },
+  {
+    "title": "Mission and Vision",
+    "content": "Hyprbots aims to free humans from repetitive finance tasks by co-designing AI-assistants with CFOs across industries."
+  },
+  {
+    "title": "Deployment Philosophy",
+    "content": "No custom IT project is required. Hyprbots assistants are ready-to-use and can be configured to suit customer-specific needs."
+  }
+]

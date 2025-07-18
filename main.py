@@ -3,9 +3,8 @@ import json
 import pyttsx3
 import speech_recognition as sr
 import faiss
-import torch
+import ollama
 from sentence_transformers import SentenceTransformer
-from transformers import AutoModelForCausalLM, AutoTokenizer
 import re
 import datetime
 from calendar_helper import create_event
@@ -21,7 +20,7 @@ import datetime
 
 # Example usage:
 now = datetime.datetime.now() + datetime.timedelta(hours=1)
-create_event("Call with Customer", now, duration_minutes=15)
+# create_event("Call with Customer", now, duration_minutes=15)
 
 class RAG:
     def __init__(self):
@@ -40,12 +39,27 @@ class RAG:
             pickle.dump(docs, f)
 
     def load_index(self):
-        self.index = faiss.read_index(INDEX_PATH)
-        with open(EMBEDDINGS_PATH, "rb") as f:
-            import pickle
-            self.documents = pickle.load(f)
+        try:
+            self.index = faiss.read_index(INDEX_PATH)
+            with open(EMBEDDINGS_PATH, "rb") as f:
+                import pickle
+                self.documents = pickle.load(f)
+            print(f"✅ Loaded RAG index with {len(self.documents)} documents")
+        except Exception as e:
+            print(f"❌ Error loading RAG index: {e}")
+            print("🔄 Rebuilding index...")
+            # If loading fails, rebuild the index
+            with open(DOC_PATH) as f:
+                docs = json.load(f)
+            self.build_index(docs)
 
     def retrieve(self, query, top_k=3):
+        if self.index is None:
+            print("⚠️ RAG index not loaded, attempting to load...")
+            self.load_index()
+            if self.index is None:
+                return ["No documents available for retrieval."]
+        
         query_vec = self.model.encode([query])
         D, I = self.index.search(query_vec, top_k)
         return [self.documents[i] for i in I[0]]
@@ -53,22 +67,35 @@ class RAG:
 class VoiceAgent:
     def __init__(self):
         self.rag = RAG()
-        self.tokenizer = AutoTokenizer.from_pretrained("mistralai/Mistral-7B-Instruct-v0.2")
-        self.llm = AutoModelForCausalLM.from_pretrained("mistralai/Mistral-7B-Instruct-v0.2", torch_dtype=torch.float32)
-        self.llm.eval()
+        self.model_name = "llama3.2:3b"
         self.tts = pyttsx3.init()
         self.listener = sr.Recognizer()
 
     def listen(self):
         with sr.Microphone() as source:
-            print("🎤 Listening...")
-            audio = self.listener.listen(source)
+            # Adjust microphone for ambient noise
+            self.listener.adjust_for_ambient_noise(source, duration=0.5)
+            print("🎤 Listening... (speak naturally, I'll wait for you to finish)")
+            
+            # Increase timeout and phrase_time_limit for more patient listening
+            audio = self.listener.listen(
+                source, 
+                timeout=10,  # Wait up to 10 seconds for speech to start
+                phrase_time_limit=15,  # Allow up to 15 seconds for a complete phrase
+                snowboy_configuration=None
+            )
         try:
             text = self.listener.recognize_google(audio)
             print(f"👂 You said: {text}")
             return text
+        except sr.WaitTimeoutError:
+            print("⏰ No speech detected within timeout period")
+            return ""
+        except sr.UnknownValueError:
+            print("❌ Could not understand the audio")
+            return ""
         except Exception as e:
-            print(f"❌ Could not understand: {e}")
+            print(f"❌ Error: {e}")
             return ""
 
     def speak(self, text):
@@ -77,11 +104,30 @@ class VoiceAgent:
         self.tts.runAndWait()
 
     def answer(self, query):
-        context = "\n".join(self.rag.retrieve(query))
+        retrieved_docs = self.rag.retrieve(query)
+        # Convert documents to strings if they're dictionaries
+        context_parts = []
+        for doc in retrieved_docs:
+            if isinstance(doc, dict):
+                content = doc.get('content', str(doc))
+            else:
+                content = str(doc)
+            context_parts.append(content)
+        
+        context = "\n".join(context_parts)
         prompt = f"Context: {context}\n\nQuestion: {query}\nAnswer:"
-        inputs = self.tokenizer(prompt, return_tensors="pt")
-        outputs = self.llm.generate(**inputs, max_new_tokens=100)
-        return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        
+        try:
+            response = ollama.chat(model=self.model_name, messages=[
+                {
+                    'role': 'user',
+                    'content': prompt
+                }
+            ])
+            return response['message']['content']
+        except Exception as e:
+            print(f"Error calling Ollama: {e}")
+            return "I'm sorry, I couldn't process your request right now."
 
     def parse_schedule_request(self, user_input):
         """Parse user input to extract scheduling information"""
