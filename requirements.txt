@@ -10,3 +10,10 @@ google-auth-httplib2
 google-auth-oauthlib
 selenium
 jupyter
+textblob
+numpy
+requests
+beautifulsoup4
+librosa
+soundfile
+scipy
