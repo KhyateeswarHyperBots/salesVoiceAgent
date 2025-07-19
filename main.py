@@ -1597,7 +1597,7 @@ Please provide a personalized response based on the context, web research, websi
         print(f"Client Database: {len(self.client_rag.clients)} clients loaded")
         print("=" * 60)
         
-        welcome_message = f"Welcome {client.get('Full Name')}! I'm excited to tell you about Hyprbots' AI solutions for finance automation. We offer AI-powered invoice processing, financial document automation, CFO dashboards, and intelligent financial assistants. What would you like to know about our products and services?"
+        welcome_message = f"Hi {client.get('Full Name')}, this is Sunny from Hyprbots. I'm calling because companies like Carter's Inc. are losing thousands of dollars monthly on manual invoice processing. We've helped similar companies cut that cost by 90%. You're probably spending 10+ hours a week on this - am I right?"
         print(f"\n🤖 ASSISTANT: {welcome_message}")
         print("=" * 60)
         self.speak_interruptible(welcome_message)

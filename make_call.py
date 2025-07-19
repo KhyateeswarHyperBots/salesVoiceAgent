@@ -332,32 +332,33 @@ class OutboundCallAgent:
             # Use the stored original client number for client data lookup
             original_client_number = getattr(self, 'original_client_number', self.to_number)
 
-            # Find client using original client RAG system
-            if self.client_rag:
-                self.current_client = self.client_rag.search_client_by_phone(original_client_number)
-            else:
-                # Fallback to basic client lookup with flexible phone matching
-                try:
-                    with open('clients.json', 'r') as f:
-                        clients = json.load(f)
-                    
-                    # Normalize the input phone number (remove + and spaces)
-                    normalized_input = original_client_number.replace('+', '').replace(' ', '')
-                    
-                    # Try to find client with flexible phone matching
-                    self.current_client = None
-                    for client in clients:
-                        client_phone = client.get('Phone', '')
-                        if client_phone:
-                            # Normalize client phone number
-                            normalized_client_phone = client_phone.replace('+', '').replace(' ', '')
-                            if normalized_client_phone == normalized_input:
-                                self.current_client = client
-                                break
-                    
-                except Exception as e:
-                    print(f"❌ Error in client lookup: {e}")
-                    self.current_client = None
+            # Find client using flexible phone matching (primary method)
+            try:
+                with open('clients.json', 'r') as f:
+                    clients = json.load(f)
+                
+                # Normalize the input phone number (remove + and spaces)
+                normalized_input = (original_client_number or '').replace('+', '').replace(' ', '')
+                
+                # Try to find client with flexible phone matching
+                self.current_client = None
+                for client in clients:
+                    client_phone = client.get('Phone', '')
+                    if client_phone:
+                        # Normalize client phone number
+                        normalized_client_phone = client_phone.replace('+', '').replace(' ', '')
+                        if normalized_client_phone == normalized_input:
+                            self.current_client = client
+                            break
+                
+                # If not found with basic lookup, try client RAG system as fallback
+                if not self.current_client and self.client_rag:
+                    print("🔄 Trying client RAG system as fallback...")
+                    self.current_client = self.client_rag.search_client_by_phone(original_client_number)
+                
+            except Exception as e:
+                print(f"❌ Error in client lookup: {e}")
+                self.current_client = None
 
             print(f"📞 Call from: {from_number}")
             print(f"👤 Using client data from: {original_client_number}")
@@ -373,9 +374,9 @@ class OutboundCallAgent:
             response = VoiceResponse()
             
             if self.current_client:
-                welcome_message = f"Hello {self.current_client.get('Full Name')}! I'm your AI sales assistant. I'm here to help you with information about Hyprbots' innovative automation solutions. How can I assist you today?"
+                welcome_message = f"Hi {self.current_client.get('Full Name')}, this is Sunny from Hyprbots. I'm calling because companies like {self.current_client.get('Company', 'yours')} are losing thousands of dollars monthly on manual invoice processing. We've helped similar companies cut that cost by 90%. You're probably spending 10+ hours a week on this - am I right?"
             else:
-                welcome_message = "Hello! I'm your AI sales assistant. I'm here to help you with information about Hyprbots' innovative automation solutions. How can I assist you today?"
+                welcome_message = "Hi, this is Sunny from Hyprbots. I'm calling because companies are losing thousands of dollars monthly on manual invoice processing. We've helped similar companies cut that cost by 90%. You're probably spending 10+ hours a week on this - am I right?"
             
             # Speak welcome message
             response.say(welcome_message, voice='alice')
@@ -383,12 +384,11 @@ class OutboundCallAgent:
             # Gather user input
             gather = Gather(
                 input='speech',
-                timeout=10,
-                speech_timeout='auto',
+                timeout=15,
+                speech_timeout=3,
                 action='/process_speech',
                 method='POST'
             )
-            gather.say("Please speak after the beep.", voice='alice')
             response.append(gather)
             
             # If no input, end call
@@ -412,12 +412,11 @@ class OutboundCallAgent:
                 response.say("I didn't catch that. Could you please repeat?", voice='alice')
                 gather = Gather(
                     input='speech',
-                    timeout=10,
-                    speech_timeout='auto',
+                    timeout=15,
+                    speech_timeout=3,
                     action='/process_speech',
                     method='POST'
                 )
-                gather.say("Please speak after the beep.", voice='alice')
                 response.append(gather)
                 response.say("Thank you for calling. Goodbye!", voice='alice')
                 response.hangup()
@@ -447,18 +446,28 @@ class OutboundCallAgent:
             # Continue conversation
             gather = Gather(
                 input='speech',
-                timeout=10,
-                speech_timeout='auto',
+                timeout=15,
+                speech_timeout=3,
                 action='/process_speech',
                 method='POST'
             )
-            gather.say("Please speak after the beep.", voice='alice')
             response.append(gather)
             
-            # End call if no more input
-            response.say("Thank you for calling. Goodbye!", voice='alice')
-            response.hangup()
+            # Debug: Print the TwiML response
+            twiml_response = str(response)
+            print(f"📞 TwiML Response: {twiml_response}")
             
+            # Only end call if no input is received (this will be handled by the gather timeout)
+            # Don't add goodbye message here - let the gather handle the flow
+            
+            return Response(twiml_response, mimetype='text/xml')
+        
+        @self.app.route('/timeout', methods=['POST'])
+        def handle_timeout():
+            """Handle when user doesn't respond within timeout"""
+            response = VoiceResponse()
+            response.say("I didn't hear from you. Thank you for calling Hyprbots. Have a great day!", voice='alice')
+            response.hangup()
             return Response(str(response), mimetype='text/xml')
     
     def generate_enhanced_response(self, user_input):
@@ -560,6 +569,32 @@ Please provide a personalized response based on the context, web research, websi
             ])
             
             ai_response = response['message']['content']
+            
+            # Clean and limit the response for Twilio speech synthesis
+            # Remove quotes and limit length for better speech synthesis
+            ai_response = ai_response.replace('"', '').replace('"', '').replace('"', '')
+            ai_response = ai_response.replace('\n', ' ').replace('  ', ' ')
+            
+            # Remove ALL meta-commentary and approach explanations
+            meta_phrases = [
+                "Here's my approach:", "This response aims to:", "Here's a personalized response:",
+                "I'd be happy to help you craft", "Given Jane's low interest", "I'll focus on building",
+                "This response aims to:", "Here's what I suggest:", "My approach would be:",
+                "I'd recommend:", "Here's how I'd respond:", "Let me craft a response:"
+            ]
+            
+            for phrase in meta_phrases:
+                if phrase in ai_response:
+                    ai_response = ai_response.split(phrase)[-1]
+            
+            # Limit to MAXIMUM 30 WORDS
+            words = ai_response.split()
+            if len(words) > 30:
+                ai_response = ' '.join(words[:30])
+            
+            # Ensure it ends properly
+            if not ai_response.endswith(('.', '!', '?')):
+                ai_response = ai_response.rstrip() + '.'
             
             # Add to conversation history
             self.conversation_history.append({
