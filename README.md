@@ -72,6 +72,47 @@ The agent uses the following configuration in `config.env`:
 - **`embeddings.pkl` & `vector.index`**: RAG index files
 - **`client_embeddings.pkl` & `client_vector.index`**: Client RAG index
 
+## Security & Setup
+
+### 🔒 Important Security Notes
+
+**NEVER commit sensitive files to git!** The following files are automatically ignored:
+- `config.env` - Contains your API keys and tokens
+- `credentials.json` - Google Calendar credentials
+- `models/` - Large AI model files
+- `conversations/` - Call recordings and logs
+- `*.pkl`, `*.index` - Embeddings and vector files
+
+### Initial Setup
+
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd salesVoiceAgent
+   ```
+
+2. **Create your configuration**:
+   ```bash
+   cp config.env.example config.env
+   # Edit config.env with your real API keys and tokens
+   ```
+
+3. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Set up Ollama**:
+   ```bash
+   ollama pull llama3.2:3b
+   ollama serve
+   ```
+
+5. **Set up ngrok** (for webhook tunneling):
+   ```bash
+   ngrok http 5002
+   ```
+
 ## Requirements
 
 - Python 3.8+
