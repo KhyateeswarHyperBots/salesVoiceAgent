@@ -587,11 +587,6 @@ Please provide a personalized response based on the context, web research, websi
                 if phrase in ai_response:
                     ai_response = ai_response.split(phrase)[-1]
             
-            # Limit to MAXIMUM 30 WORDS
-            words = ai_response.split()
-            if len(words) > 30:
-                ai_response = ' '.join(words[:30])
-            
             # Ensure it ends properly
             if not ai_response.endswith(('.', '!', '?')):
                 ai_response = ai_response.rstrip() + '.'
