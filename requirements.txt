@@ -20,3 +20,6 @@ scipy
 python-dotenv
 twilio
 flask
+vaderSentiment
+spacy
+scikit-learn

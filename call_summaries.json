@@ -1,0 +1,60 @@
+[
+  {
+    "session_id": "20250724_013109",
+    "call_start_time": "2025-07-24T01:31:35.976874",
+    "call_end_time": "2025-07-24T01:32:24.974329",
+    "call_duration_seconds": 48.997441,
+    "end_reason": "Call ended by user",
+    "client_info": {
+      "name": "Matthew Steinberg",
+      "company": "Manh",
+      "phone": "18433672465",
+      "email": "msteinberg@manh.com"
+    },
+    "sales_intelligence": {
+      "final_buying_probability": 0.0,
+      "total_buying_signals": 0,
+      "total_objection_signals": 0,
+      "engagement_score": 0.0,
+      "sentiment_history": [],
+      "conversation_turns": 0
+    },
+    "conversation_summary": {
+      "total_exchanges": 0,
+      "user_inputs": [],
+      "ai_responses": []
+    },
+    "calendar_events_created": 5
+  },
+  {
+    "session_id": "20250724_013707",
+    "call_start_time": "2025-07-24T01:37:38.275961",
+    "call_end_time": "2025-07-24T01:39:07.118256",
+    "call_duration_seconds": 88.842281,
+    "end_reason": "Call ended by user",
+    "client_info": {
+      "name": "Matthew Steinberg",
+      "company": "Manh",
+      "phone": "18433672465",
+      "email": "msteinberg@manh.com"
+    },
+    "sales_intelligence": {
+      "final_buying_probability": 21.0,
+      "total_buying_signals": 0,
+      "total_objection_signals": 0,
+      "engagement_score": 0.0,
+      "sentiment_history": [],
+      "conversation_turns": 2
+    },
+    "conversation_summary": {
+      "total_exchanges": 2,
+      "user_inputs": [
+        "Great. Thank you."
+      ],
+      "ai_responses": [
+        "Hi Matthew, thanks for chatting with me today. I understand that Hyprbots is already a part of Manh's financial ecosystem. Can you tell me more about what challenges you're facing in terms of automating finance tasks? Are there any specific areas where you feel like manual processes are holding you back?"
+      ]
+    },
+    "calendar_events_created": 6
+  }
+]

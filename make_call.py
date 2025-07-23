@@ -19,6 +19,7 @@ import faiss
 from sentence_transformers import SentenceTransformer
 import textblob
 from textblob import TextBlob
+from enhanced_sentiment_analysis import EnhancedSentimentAnalysis
 
 # Suppress warnings
 warnings.filterwarnings('ignore')
@@ -100,6 +101,9 @@ class OutboundCallAgent:
         self.current_client = None
         self.session_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         
+        # Enhanced sentiment analysis
+        self.sentiment_analyzer = EnhancedSentimentAnalysis(model_type="ensemble")
+        
         # Sentiment analysis and buying signals tracking
         self._sentiment_history = []
         self._buying_signals = []
@@ -124,79 +128,67 @@ class OutboundCallAgent:
         print(f"   From: {self.from_number}")
         print(f"   To: {self.to_number}")
         print(f"   Model: {self.model_name}")
-        print(f"   Features: Web Scraping, ChatGPT Web Search, RAG, Sentiment Analysis")
+        print(f"   Features: Web Scraping, ChatGPT Web Search, RAG, Enhanced Sentiment Analysis")
+        print(f"   Sentiment Models: {list(self.sentiment_analyzer.models.keys())}")
     
     def analyze_sentiment(self, text):
-        """Analyze text sentiment using TextBlob (from main.py)"""
+        """Analyze text sentiment using enhanced models"""
         try:
-            blob = TextBlob(text)
-            sentiment_score = blob.sentiment.polarity
+            # Use enhanced sentiment analysis
+            result = self.sentiment_analyzer.analyze_sentiment(text)
             
-            if sentiment_score > 0.1:
-                sentiment = "positive"
-            elif sentiment_score < -0.1:
-                sentiment = "negative"
-            else:
-                sentiment = "neutral"
+            # Print detailed intent analysis
+            sales_signals = result.get('sales_signals', {})
+            intent = sales_signals.get('intent', 'neutral')
+            confidence = sales_signals.get('confidence', 0.5)
+            buying_score = sales_signals.get('buying_score', 0)
+            objection_score = sales_signals.get('objection_score', 0)
+            positive_score = sales_signals.get('positive_score', 0)
+            negative_score = sales_signals.get('negative_score', 0)
             
-            return {
-                'sentiment': sentiment,
-                'polarity': sentiment_score,
-                'subjectivity': blob.sentiment.subjectivity
-            }
+            # Calculate intent percentage
+            intent_percentage = confidence * 100
+            
+            print(f"🎯 INTENT: {intent.upper()} ({intent_percentage:.1f}%)")
+            print(f"   📈 Buying Score: {buying_score}, Objection Score: {objection_score}")
+            print(f"   ✅ Positive Score: {positive_score}, ❌ Negative Score: {negative_score}")
+            
+            # Show detected keywords if any
+            if sales_signals.get('buying_signals'):
+                print(f"   🎯 Buying Signals: {', '.join(sales_signals['buying_signals'])}")
+            if sales_signals.get('objections'):
+                print(f"   ⚠️ Objections: {', '.join(sales_signals['objections'])}")
+            if sales_signals.get('positive_words'):
+                print(f"   ✅ Positive Words: {', '.join(sales_signals['positive_words'])}")
+            if sales_signals.get('negative_words'):
+                print(f"   ❌ Negative Words: {', '.join(sales_signals['negative_words'])}")
+            
+            return result
         except Exception as e:
             print(f"Error in sentiment analysis: {e}")
             return {
                 'sentiment': 'neutral',
                 'polarity': 0.0,
-                'subjectivity': 0.0
+                'subjectivity': 0.0,
+                'sales_signals': {
+                    'intent': 'neutral',
+                    'confidence': 0.5
+                }
             }
     
-    def detect_buying_signals(self, text):
-        """Detect buying signals in text (from main.py)"""
-        buying_keywords = [
-            'interested', 'pricing', 'cost', 'price', 'quote', 'proposal',
-            'demo', 'trial', 'purchase', 'buy', 'implement', 'deploy',
-            'solution', 'benefits', 'roi', 'investment', 'budget',
-            'timeline', 'schedule', 'next steps', 'decision', 'approval'
-        ]
-        
-        objection_keywords = [
-            'expensive', 'costly', 'budget', 'expensive', 'not sure',
-            'concerned', 'worried', 'risk', 'security', 'integration',
-            'complex', 'difficult', 'time', 'resources', 'staff',
-            'training', 'support', 'maintenance'
-        ]
-        
-        text_lower = text.lower()
-        buying_signals = [word for word in buying_keywords if word in text_lower]
-        objections = [word for word in objection_keywords if word in text_lower]
-        
-        return {
-            'buying_signals': buying_signals,
-            'objections': objections,
-            'buying_score': len(buying_signals),
-            'objection_score': len(objections)
-        }
+
     
     def update_buying_probability(self, user_input, sentiment_data, buying_signals):
         """Update buying probability based on conversation (from main.py)"""
-        # Sentiment impact
-        sentiment_impact = sentiment_data['polarity'] * 10
+        # Use enhanced buying probability calculation
+        new_prob = self.sentiment_analyzer.get_buying_probability(sentiment_data)
         
-        # Buying signals impact
-        buying_impact = buying_signals['buying_score'] * 5
-        
-        # Objection impact (negative)
-        objection_impact = -buying_signals['objection_score'] * 3
-        
-        # Update probability
-        new_prob = self._buying_probability + sentiment_impact + buying_impact + objection_impact
-        
-        # Clamp between 0 and 100
-        self._buying_probability = max(0, min(100, new_prob))
+        # Update probability with some smoothing
+        self._buying_probability = (self._buying_probability * 0.7) + (new_prob * 0.3)
         
         print(f"💰 Buying probability: {self._buying_probability:.1f}%")
+    
+
     
     def fetch_web_data_for_client(self, client):
         """Fetch web data for client (from main.py)"""
@@ -370,6 +362,9 @@ class OutboundCallAgent:
             # Setup client session with web data
             self.setup_client_session(self.current_client)
             
+            # Track call start time
+            self.call_start_time = datetime.datetime.now()
+            
             # Create TwiML response
             response = VoiceResponse()
             
@@ -424,20 +419,69 @@ class OutboundCallAgent:
             
             # Check for end call keywords
             if any(word in speech_result.lower() for word in ['goodbye', 'bye', 'end call', 'hang up', 'stop']):
+                # Analyze sentiment and buying signals before ending
+                sentiment_data = self.analyze_sentiment(speech_result)
+                buying_signals = sentiment_data.get('sales_signals', {})
+                
+                # Update buying probability one final time
+                self.update_buying_probability(speech_result, sentiment_data, buying_signals)
+                
+                # Print final intent analysis
+                if sentiment_data:
+                    sales_signals = sentiment_data.get('sales_signals', {})
+                    intent = sales_signals.get('intent', 'neutral')
+                    confidence = sales_signals.get('confidence', 0.5)
+                    buying_score = sales_signals.get('buying_score', 0)
+                    objection_score = sales_signals.get('objection_score', 0)
+                    positive_score = sales_signals.get('positive_score', 0)
+                    negative_score = sales_signals.get('negative_score', 0)
+                    
+                    intent_percentage = confidence * 100
+                    
+                    print(f"🎯 FINAL INTENT: {intent.upper()} ({intent_percentage:.1f}%)")
+                    print(f"   📈 Final Buying Score: {buying_score}, Objection Score: {objection_score}")
+                    print(f"   ✅ Final Positive Score: {positive_score}, ❌ Negative Score: {negative_score}")
+                    print(f"   💰 Final Buying Probability: {self._buying_probability:.1f}%")
+                
+                # Save call summary before ending
+                self.save_call_summary("Call ended by user")
+                
+                # Create proper goodbye response
                 response = VoiceResponse()
                 response.say("Thank you for calling. Have a great day!", voice='alice')
                 response.hangup()
+                
+                print("👋 Saying goodbye and ending call...")
+                return Response(str(response), mimetype='text/xml')
+            
+            # Check for scheduling requests first
+            scheduling_keywords = ['schedule', 'book', 'appointment', 'demo', 'meeting', 'show me', 'give me', 'set up']
+            if any(keyword in speech_result.lower() for keyword in scheduling_keywords):
+                schedule_response = self.schedule_event(speech_result)
+                response = VoiceResponse()
+                response.say(schedule_response, voice='alice')
+                
+                # Continue conversation
+                gather = Gather(
+                    input='speech',
+                    timeout=15,
+                    speech_timeout=3,
+                    action='/process_speech',
+                    method='POST'
+                )
+                response.append(gather)
+                
                 return Response(str(response), mimetype='text/xml')
             
             # Analyze sentiment and buying signals (from main.py)
             sentiment_data = self.analyze_sentiment(speech_result)
-            buying_signals = self.detect_buying_signals(speech_result)
+            buying_signals = sentiment_data.get('sales_signals', {})
             
             # Update buying probability
             self.update_buying_probability(speech_result, sentiment_data, buying_signals)
             
             # Generate AI response using original architecture
-            ai_response = self.generate_enhanced_response(speech_result)
+            ai_response = self.generate_enhanced_response(speech_result, sentiment_data)
             
             # Create TwiML response
             response = VoiceResponse()
@@ -465,12 +509,15 @@ class OutboundCallAgent:
         @self.app.route('/timeout', methods=['POST'])
         def handle_timeout():
             """Handle when user doesn't respond within timeout"""
+            # Save call summary before ending
+            self.save_call_summary("Call ended due to timeout")
+            
             response = VoiceResponse()
             response.say("I didn't hear from you. Thank you for calling Hyprbots. Have a great day!", voice='alice')
             response.hangup()
             return Response(str(response), mimetype='text/xml')
     
-    def generate_enhanced_response(self, user_input):
+    def generate_enhanced_response(self, user_input, sentiment_data=None):
         """Generate AI response using original main.py architecture"""
         try:
             # Add to conversation history
@@ -598,6 +645,35 @@ Please provide a personalized response based on the context, web research, websi
             })
             
             print(f"🤖 AI Response: {ai_response}")
+            
+            # Print intent analysis after AI response
+            if sentiment_data:
+                sales_signals = sentiment_data.get('sales_signals', {})
+                intent = sales_signals.get('intent', 'neutral')
+                confidence = sales_signals.get('confidence', 0.5)
+                buying_score = sales_signals.get('buying_score', 0)
+                objection_score = sales_signals.get('objection_score', 0)
+                positive_score = sales_signals.get('positive_score', 0)
+                negative_score = sales_signals.get('negative_score', 0)
+                
+                # Calculate intent percentage
+                intent_percentage = confidence * 100
+                
+                print(f"🎯 INTENT: {intent.upper()} ({intent_percentage:.1f}%)")
+                print(f"   📈 Buying Score: {buying_score}, Objection Score: {objection_score}")
+                print(f"   ✅ Positive Score: {positive_score}, ❌ Negative Score: {negative_score}")
+                print(f"   💰 Buying probability: {self._buying_probability:.1f}%")
+                
+                # Show detected keywords if any
+                if sales_signals.get('buying_signals'):
+                    print(f"   🎯 Buying Signals: {', '.join(sales_signals['buying_signals'])}")
+                if sales_signals.get('objections'):
+                    print(f"   ⚠️ Objections: {', '.join(sales_signals['objections'])}")
+                if sales_signals.get('positive_words'):
+                    print(f"   ✅ Positive Words: {', '.join(sales_signals['positive_words'])}")
+                if sales_signals.get('negative_words'):
+                    print(f"   ❌ Negative Words: {', '.join(sales_signals['negative_words'])}")
+            
             return ai_response
             
         except Exception as e:
@@ -655,6 +731,256 @@ Please provide a personalized response based on the context, web research, websi
         except Exception as e:
             print(f"❌ Error making call: {e}")
     
+    def parse_schedule_request(self, user_input):
+        """Parse user input to extract scheduling information"""
+        user_input_lower = user_input.lower()
+        
+        # Default values
+        event_title = "Sales Call"
+        duration = 30
+        start_time = datetime.datetime.now() + datetime.timedelta(hours=1)
+        attendees = []
+        
+        # Extract email addresses from user input
+        import re
+        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        emails = re.findall(email_pattern, user_input)
+        attendees.extend(emails)
+        
+        # Extract event title
+        if "demo" in user_input_lower:
+            event_title = "Product Demo Call"
+        elif "meeting" in user_input_lower:
+            event_title = "Sales Meeting"
+        elif "call" in user_input_lower:
+            event_title = "Sales Call"
+        
+        # Extract duration
+        import re
+        duration_match = re.search(r'(\d+)\s*(min|minute|minutes|hour|hours)', user_input_lower)
+        if duration_match:
+            value = int(duration_match.group(1))
+            unit = duration_match.group(2)
+            if unit in ['hour', 'hours']:
+                duration = value * 60
+            else:
+                duration = value
+        
+        # Extract time information
+        time_patterns = [
+            r'tomorrow\s+at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?',
+            r'today\s+at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?',
+            r'(\d{1,2})(?::(\d{2}))?\s*(am|pm)?',
+            r'in\s+(\d+)\s*(hour|hours|minute|minutes)',
+        ]
+        
+        for pattern in time_patterns:
+            match = re.search(pattern, user_input_lower)
+            if match:
+                if 'tomorrow' in pattern:
+                    start_time = datetime.datetime.now() + datetime.timedelta(days=1)
+                    hour = int(match.group(1))
+                    minute = int(match.group(2)) if match.group(2) else 0
+                    ampm = match.group(3)
+                    if ampm == 'pm' and hour != 12:
+                        hour += 12
+                    elif ampm == 'am' and hour == 12:
+                        hour = 0
+                    start_time = start_time.replace(hour=hour, minute=minute)
+                    break
+                elif 'today' in pattern:
+                    hour = int(match.group(1))
+                    minute = int(match.group(2)) if match.group(2) else 0
+                    ampm = match.group(3)
+                    if ampm == 'pm' and hour != 12:
+                        hour += 12
+                    elif ampm == 'am' and hour == 12:
+                        hour = 0
+                    start_time = datetime.datetime.now().replace(hour=hour, minute=minute)
+                    if start_time < datetime.datetime.now():
+                        start_time += datetime.timedelta(days=1)
+                    break
+                elif 'in' in pattern:
+                    value = int(match.group(1))
+                    unit = match.group(2)
+                    if unit in ['hour', 'hours']:
+                        start_time = datetime.datetime.now() + datetime.timedelta(hours=value)
+                    else:
+                        start_time = datetime.datetime.now() + datetime.timedelta(minutes=value)
+                    break
+                else:
+                    # Just time specified, assume today
+                    hour = int(match.group(1))
+                    minute = int(match.group(2)) if match.group(2) else 0
+                    ampm = match.group(3)
+                    if ampm == 'pm' and hour != 12:
+                        hour += 12
+                    elif ampm == 'am' and hour == 12:
+                        hour = 0
+                    start_time = datetime.datetime.now().replace(hour=hour, minute=minute)
+                    if start_time < datetime.datetime.now():
+                        start_time += datetime.timedelta(days=1)
+                    break
+        
+        return event_title, start_time, duration, attendees
+
+    def schedule_event(self, user_input):
+        """Create a calendar event based on user input"""
+        try:
+            event_title, start_time, duration, parsed_attendees = self.parse_schedule_request(user_input)
+            
+            # Get client info for description
+            client_info = ""
+            if self.current_client:
+                client_info = f"Client: {self.current_client.get('Full Name')} from {self.current_client.get('Company')}"
+            
+            # Create the calendar event
+            from calendar_helper import create_event
+            
+            # Prepare attendees list with client contact info
+            attendees = []
+            
+            # Add any emails mentioned in the conversation
+            attendees.extend(parsed_attendees)
+            
+            # Add current client details
+            if self.current_client:
+                # Add client email if available and not already in attendees
+                client_email = self.current_client.get('Email', '')
+                if client_email and client_email not in attendees:
+                    attendees.append(client_email)
+                # Add client phone if no email and not already in attendees
+                elif self.current_client.get('Phone', ''):
+                    client_phone = f"Phone: {self.current_client.get('Phone')}"
+                    if client_phone not in attendees:
+                        attendees.append(client_phone)
+                # Add client name as fallback
+                else:
+                    client_name = f"Client: {self.current_client.get('Full Name', 'Unknown')}"
+                    if client_name not in attendees:
+                        attendees.append(client_name)
+            
+            # Get current sales intelligence data
+            sales_intelligence = {
+                "buying_probability": self._buying_probability,
+                "intent": "neutral",
+                "intent_confidence": 0.0,
+                "buying_signals": len(self._buying_signals),
+                "objection_signals": len(self._objection_signals),
+                "engagement_score": self._engagement_score
+            }
+            
+            # Get latest sentiment data if available
+            if self._sentiment_history:
+                latest_sentiment = self._sentiment_history[-1]
+                sales_intelligence.update({
+                    "sentiment": latest_sentiment.get('sentiment', 'neutral'),
+                    "polarity": latest_sentiment.get('polarity', 0.0),
+                    "subjectivity": latest_sentiment.get('subjectivity', 0.0)
+                })
+            
+            # Get sales signals from latest sentiment analysis
+            if self._sentiment_history:
+                latest_sales_signals = latest_sentiment.get('sales_signals', {})
+                sales_intelligence.update({
+                    "intent": latest_sales_signals.get('intent', 'neutral'),
+                    "intent_confidence": latest_sales_signals.get('confidence', 0.0)
+                })
+            
+            # Create enhanced description with sales intelligence
+            enhanced_description = f"""Automatically scheduled based on: {user_input}
+{client_info}
+
+SALES INTELLIGENCE:
+- Buying Probability: {self._buying_probability:.1f}%
+- Intent: {sales_intelligence['intent'].upper()} ({sales_intelligence['intent_confidence']*100:.1f}% confidence)
+- Sentiment: {sales_intelligence.get('sentiment', 'neutral')} (Polarity: {sales_intelligence.get('polarity', 0.0):.2f})
+- Buying Signals Detected: {sales_intelligence['buying_signals']}
+- Objection Signals Detected: {sales_intelligence['objection_signals']}
+- Engagement Score: {sales_intelligence['engagement_score']:.2f}"""
+            
+            result = create_event(
+                summary=event_title,
+                start_time=start_time,
+                duration_minutes=duration,
+                description=enhanced_description,
+                location="Phone Call",
+                attendees=attendees,
+                sales_intelligence=sales_intelligence
+            )
+            
+            return result
+            
+        except Exception as e:
+            print(f"Error creating calendar event: {e}")
+            return "I'm sorry, I couldn't create the calendar event. Please try again."
+
+    def save_call_summary(self, end_reason="Call ended normally"):
+        """Save detailed call summary with sales intelligence"""
+        try:
+            # Calculate call duration
+            call_start = getattr(self, 'call_start_time', datetime.datetime.now())
+            call_duration = (datetime.datetime.now() - call_start).total_seconds()
+            
+            # Prepare call summary
+            call_summary = {
+                "session_id": self.session_id,
+                "call_start_time": call_start.isoformat(),
+                "call_end_time": datetime.datetime.now().isoformat(),
+                "call_duration_seconds": call_duration,
+                "end_reason": end_reason,
+                "client_info": {
+                    "name": self.current_client.get('Full Name', 'Unknown') if self.current_client else 'Unknown',
+                    "company": self.current_client.get('Company', 'Unknown') if self.current_client else 'Unknown',
+                    "phone": self.current_client.get('Phone', 'Unknown') if self.current_client else 'Unknown',
+                    "email": self.current_client.get('Email', '') if self.current_client else ''
+                },
+                "sales_intelligence": {
+                    "final_buying_probability": self._buying_probability,
+                    "total_buying_signals": len(self._buying_signals),
+                    "total_objection_signals": len(self._objection_signals),
+                    "engagement_score": self._engagement_score,
+                    "sentiment_history": self._sentiment_history[-5:] if self._sentiment_history else [],  # Last 5 sentiments
+                    "conversation_turns": len(self.conversation_history)
+                },
+                "conversation_summary": {
+                    "total_exchanges": len(self.conversation_history),
+                    "user_inputs": [msg['content'] for msg in self.conversation_history if msg['role'] == 'user'],
+                    "ai_responses": [msg['content'] for msg in self.conversation_history if msg['role'] == 'assistant']
+                },
+                "calendar_events_created": len([event for event in self._get_recent_calendar_events() if event.get('created_at', '').startswith(datetime.datetime.now().strftime('%Y-%m-%d'))])
+            }
+            
+            # Save to call summaries file
+            summaries_file = "call_summaries.json"
+            summaries = []
+            
+            if os.path.exists(summaries_file):
+                try:
+                    with open(summaries_file, 'r') as f:
+                        summaries = json.load(f)
+                except (json.JSONDecodeError, FileNotFoundError):
+                    summaries = []
+            
+            summaries.append(call_summary)
+            
+            with open(summaries_file, 'w') as f:
+                json.dump(summaries, f, indent=2)
+            
+            print(f"📊 Call summary saved: {call_summary['client_info']['name']} - {call_summary['sales_intelligence']['final_buying_probability']:.1f}% buying probability")
+            
+        except Exception as e:
+            print(f"❌ Error saving call summary: {e}")
+    
+    def _get_recent_calendar_events(self):
+        """Get recent calendar events for this session"""
+        try:
+            from calendar_helper import list_upcoming_events
+            events = list_upcoming_events(days_ahead=30)
+            return events
+        except:
+            return []
+
     def get_webhook_url(self):
         """Get webhook URL"""
         return "https://3a29b19f0015.ngrok-free.app"
